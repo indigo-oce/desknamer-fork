@@ -12,6 +12,13 @@ chmod +x ~/bin/desknamer/desknamer.sh
 ln -s ~/bin/desknamer/desknamer.sh ~/.local/bin/desknamer
 ```
 
+To copy the sample configuration file:
+
+```
+mkdir -p ~/.config/desknamer
+cp ~/bin/desknamer/desknamer.json ~/.config/desknamer/desknamer.json
+```
+
 ## Usage
 
 ```

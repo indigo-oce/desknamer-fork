@@ -1,163 +1,125 @@
 #!/usr/bin/env bash
 
-# this program automatically renames *existing* desktops according to
-# what's running inside. If you wish to add more desktops to a certain monitor,
-# you must run 'bspc monitor -d 1 2 3 4 5...' on that monitor to give it
-# the desired number of desktops.
-
 BLUE='\e[34m'
 GREEN='\e[32m'
 RED='\e[31m'
 R='\e[0m'
 
-searchApplications() {
-	found="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop 2>/dev/null | head -1)"
-	[ "$found" = "" ] && found="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop 2>/dev/null | head -1)"
-	[ "$found" = "" ] && found="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop 2>/dev/null | head -1)"
-	echo "$found"
-}
-
 getAllApplications() {
-	local found="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null)"
-	for application in $found; do
+	for application in "$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null)"; do
 		echo "$application"
 	done
 }
 
+getAllCategories() {
+	sed -n 's/;/ /g; s/^Categories=//p' $(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null)
+}
+
+searchApplications() {
+	find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop 2>/dev/null | head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop 2>/dev/null | head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop 2>/dev/null | head -1
+}
+
 getCategory() {
 	local application="$1"
-	if [[ $application =~ '/' ]]; then
+	if [ -z "${application##*/*}" ]; then
 		menuItem="$application"
 	else
 		menuItem="$(searchApplications "$application")"
 	fi
-	if [ "$menuItem" != "" ]; then
-		categories="$(grep -P '^Categories=' "$menuItem" | cut -d '=' -f 2)"
-		echo "$categories"
-	fi
+	[ -n "$menuItem" ] && desktopCategories+=($(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem"))
 }
 
 getCategories() {
 	local pid="$1"
 
-	local comm="$(cat "/proc/$pid/comm" 2>/dev/null | tr '\0' '\n')"
-	[ "${#comm}" -eq 0 ] && return
-
-	local children="$(ps --no-headers --ppid "$pid" 2>/dev/null | awk '{print $1}')"
+	# accessing process file is faster than ps
+	local comm="$({ tr '\0' '\n' < "/proc/$pid/comm"; } 2>/dev/null)"
+	[ -z "$comm" ] && return
+	children+=("$comm")
 
 	getCategory "$comm"
-	((recursive)) && for childPid in $children; do
-		local childComm="$(cat "/proc/$childPid/comm" 2>/dev/null | tr '\0' '\n')"
-		[ "${#childComm}" -gt 0 ] && getCategory "$childComm"
+
+	IFS=$'\n'
+	((recursive)) && for childPid in "$(ps -o pid= --ppid "$pid" 2>/dev/null)"; do
 		getCategories "$childPid"
 	done
 }
 
-getAllCategories() {
-	grep -P '^Categories=' $(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null) | cut -d '=' -f 2 | tr ';' '\n' | sort -u
-}
-
 renameDesktop() {
-	local desktopIDs="$@"
-	for desktopID in ${desktopIDs[@]}; do
-		echo " - Renaming desktopID: $desktopID"
+	local desktopID="$1"
+	monitorID="$(bspc query --desktop "$desktopID" --monitors)"
 
-		desktopName="$(bspc query --names --desktop "$desktopID" --desktops)"
-		echo -e " -- Current Desktop Name: ${GREEN}$desktopName ${R}"
-		
-		monitorID="$(bspc query --desktop "$desktopID" --monitors)"
-		echo " -- monitorID: $monitorID"
+	if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ] || [ "${desktopBlacklist#*$monitorID}" != "$desktopBlacklist" ]; then
+		echo -e " - Not renaming desktopID: $desktopID\n"
+		return 0
+	fi
+	echo " - Renaming desktopID: $desktopID"
 
-		desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
-		echo " -- desktopIndex: $desktopIndex"
+	desktopName="$(bspc query --names --desktop "$desktopID" --desktops)"
+	echo -e " -- Current Desktop Name: ${GREEN}$desktopName ${R}"
 
-		# for node (window) on this desktop, get children processes and categories
-		children=""
-		desktopCategories=""
-		for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
+	((verbose)) && echo " -- monitorID: $monitorID"
 
-			# get node's pid
-			pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
-			if [ "$pid" != "" -a "$pid" != " " ]; then
-				children+="$(pstree -AT "$pid")\n"
-				desktopCategories+="$(getCategories "$pid")"
-			fi
+	desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
+	echo " -- desktopIndex: $desktopIndex"
 
-			echo " -- Node, pid: $node, $pid"
-		done
-		echo -e " -- All Processes:\n$children"
-		echo -e " -- All Categories:\n$desktopCategories\n"
+	# for node in this desktop, get children processes and categories
+	desktopCategories=()
+	children=()
+	IFS=$'\n'
+	for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
+		pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
+		[ -n "$pid" ] && getCategories "$pid"
 
-		name=""
-
-		# if program has no categories or missing one, add them here
-		case "$children" in
-			*firefox*) desktopCategories+="firefox" ;;
-			*weechat*) desktopCategories+="Chat" ;;
-			*calibre*) desktopCategories+="Viewer" ;;
-			*soffice*) desktopCategories+="Office" ;;
-		esac
-
-		# name desktop based on found categories
-		# stops at first match
-		case "$desktopCategories" in
-			*firefox*)		name="" ;;
-			*WebBrowser*)		name="" ;;
-			*Documentation*|*Office*|*Spreadsheet*|*WordProcessor*)
-						name="" ;;
-			*Viewer*)		name="" ;;
-			*Game*|*game*)
-						name="" ;;
-			*Engineering*)		name="" ;;
-			*Graphics*)		name="" ;;
-			*Audio*|*Music*)	name="" ;;
-			*Chat*|*InstantMessaging*|*IRCClient*)
-						name="" ;;
-			*Email*)		name="" ;;
-			*Archiving*)		name="" ;;
-			*Player*)		name="" ;;
-			*Calculator*)		name="" ;;
-			*Calendar*)		name="" ;;
-			*Clock*)		name="" ;;
-			*ContactManagement*)	name="﯉" ;;
-			*Database*)		name="" ;;
-			*Dictionary*)		name="﬜" ;;
-			*DiscBurning*)		name="" ;;
-			*Math*)			name="" ;;
-			*PackageManager*)	name="" ;;
-			*Photography*)		name="" ;;
-			*Presentation*)		name="廊" ;;
-			*Recorder*)		name="壘" ;;
-			*Science*)		name="" ;;
-			*Settings*)		name="" ;;
-			*FileManager*|*Filesystem*|*FileTools*)
-						name="" ;;
-			*IDE*|*TextEditor*) 	name="" ;;
-			*TerminalEmulator*)	name="" ;;
-		esac
-
-		# fallback names
-		[ "${#name}" -eq 0 ] && [ "${#desktopCategories}" -gt 0  -o "${#children}" -gt 0 ] && name=""	# no recognized applications
-		[ "$name" == "" ] && name="$desktopIndex"	# no applications
-
-		echo -e " -- New Name: ${BLUE}$name ${R}\n"
-		bspc desktop "$desktopID" --rename "$name"
+		((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
 	done
+
+	((verbose)) && echo -e " -- All Processes:\n${children[@]}"
+
+	# check programs against custom list of categories
+	IFS=' '
+	for comm in ${children[@]}; do
+		desktopCategories+=("$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")")
+	done
+
+	echo -e " -- All Categories Found:\n${desktopCategories[@]}\n"
+
+	# check config for name with lowest priority
+	name=""
+	minPriority=100
+	IFS=' '
+	for category in ${desktopCategories[@]}; do
+		priority="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][1])" <<< "$config")"
+		if [ -n "$priority" ] && [ $(echo "$priority < $minPriority" | bc -l) -eq 1 ]; then
+			minPriority="$priority"
+			name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][0])" <<< "$config")"
+		fi
+	done
+
+	# fallback names
+	[ -z "$name" ] && [ "${#children[@]}" -gt 0 ] && name=""	# no recognized applications
+	[ -z "$name" ] && name="$desktopIndex"	# no applications
+
+	echo -e " -- New Name: ${BLUE}$name ${R}\n"
+	bspc desktop "$desktopID" --rename "$name"
 }
 
 renameMonitor() {
-	monitorID="$1"	
+	monitorID="$1"
+	# ensure monitorID exists in monitorWhitelist and not in monitorBlacklist
+	if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ]; then
+		echo -e "Not renaming monitor: $monitorID\n"
+		return 0
+	fi
 	echo "Renaming monitor: $monitorID"
-	for desktop in $(bspc query -m "$monitorID" -D); do	
-		renameDesktop "$desktop"
-	done
+	IFS=$'\n'
+	for desktop in $(bspc query -m "$monitorID" -D); do renameDesktop "$desktop"; done
 }
 
-renameAll() {	
-	echo "Renaming everything..."
-	for monitorID in $(bspc query -M); do
-		renameMonitor "$monitorID"
-	done
+renameAll() {
+	echo "Renaming monitors..."
+	IFS=$'\n'
+	for monitorID in $(bspc query -M); do renameMonitor "$monitorID"; done
 }
 
 monitor() {
@@ -179,29 +141,30 @@ flag_h=0
 recursive=1
 mode="monitor"
 
-OPTS="hacns:g:"	# the colon means it requires a value
-LONGOPTS="help,all,categories,norecursive,search,get"
+configFile=~/.config/desknamer/desknamer.json
+
+verbose=0
+python=0
+
+children=()
+desktopCategories=()
+
+OPTS="hac:ns:g:M:d:D:v"	# colon (:) means it requires a subsequent value
+LONGOPTS="help,all,config:,categories,norecursive,search:,get:,verbose,monitor-blacklist:,desktop-blacklist:"
 
 parsed=$(getopt --options=$OPTS --longoptions=$LONGOPTS -- "$@")
 eval set -- "${parsed[@]}"
 
 while true; do
 	case "$1" in
-		-h|--help)
-			flag_h=1
-			shift
-			;;
-
-		-a|--all)
-			mode="getAllApplications"
-			shift
-			;;
-
-		-c|--categories)
-			mode="getAllCategories"
-			shift
-			;;
-
+		-h|--help) flag_h=1; shift ;;
+		-c|--config) configFile="$2"; shift 2 ;;
+		-a|--all) mode="getAllApplications"; shift ;;
+		-c|--categories) mode="getAllCategories"; shift ;;
+		-n|--norecursive) recursive=0; shift ;;
+		-v|--verbose) verbose=1; shift ;;
+		-M|--monitor-blacklist) monitorBlacklistIn="$2"; shift 2 ;;
+		-D|--desktop-blacklist) desktopBlacklistIn="$2"; shift 2 ;;
 		-s|--search)
 			mode="search"
 			application="$2"
@@ -214,16 +177,7 @@ while true; do
 			shift 2
 			;;
 
-		-n|--norecursive)
-			recursive=0
-			shift
-			;;
-
-		--) # end of arguments
-			shift
-			break
-			;;
-
+		--) shift; break ;;
 		*)
 			printf '%s\n' "Error while parsing CLI options" 1>&2
 			flag_h=1
@@ -237,17 +191,40 @@ Usage: desknamer [OPTIONS]
 desknamer.sh monitors your open desktops and renames them according to what's inside.
 
 optional args:
-  -a, --all             print all applications found on your machine
-  -c, --categories      print all categories found on your machine
+  -c, --config FILE     path to alternate configuration file
   -n, --norecursive     don't inspect windows recursively
+  -M \"MONITOR [MONITOR2]...\"
+                        specify monitor names or IDs to ignore
+  -D \"DESKTOP [DESKTOP2]...\"
+                        specify desktop names or IDs to ignore
+  -a, --all             print all applications found on your machine
+      --categories      print all categories found on your machine
   -s, --search PROGRAM  find .desktop files matching *program*.desktop
   -g, --get PROGRAM     get categories for given program
+  -v, --verbose         make output more verbose
   -h, --help            show help"
+
+# convert {monitor,desktop} names to ids
+IFS=' '
+for monitor in $monitorBlacklistIn; do
+	found="$(bspc query -m "$monitor" -M) "
+	[ $? -eq 0 ] && monitorBlacklist+="$found"
+done
+for desktop in $desktopBlacklistIn; do
+	found="$(bspc query -d "$desktop" -D) "
+	[ $? -eq 0 ] && desktopBlacklist+="$found"
+done
 
 if ((flag_h)); then
 	printf '%s\n' "$HELP"
 	exit 0
 fi
+
+if [ ! -e "$configFile" ]; then
+	echo "error: config file specified does not exist: $configFile"
+	exit 1
+fi
+config="$(cat "$configFile")"
 
 case "$mode" in
 	getAllApplications) getAllApplications ;;

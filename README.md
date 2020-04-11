@@ -49,20 +49,15 @@ desknamer &
 
 ## Configuration File
 
-`desknamer` looks for a config file at `~/config/desknamer/desknamer.json` by default, but this can be specified with -c. The configuration file is a JSON file with two keys, `applications` and `categories`, that follow a particular format:
+`desknamer` looks for a config file at `~/config/desknamer/desknamer.json` by default, but this can be specified with -c. The configuration file is a JSON file with several keys.
+
+### `applications`
 
 ```
-{
-	"applications": {
-		"APPLICATION": "CATEGORY",
-		"APPLICATION": "CATEGORY",
-		...
-	},
-	"categories": {
-		"CATEGORY": ["NAME", "PRIORITY"],
-		"CATEGORY": ["NAME", "PRIORITY"],
-		...
-	}
+"applications": {
+	"APPLICATION": "CATEGORY",
+	"APPLICATION": "CATEGORY",
+	...
 }
 ```
 
@@ -72,12 +67,45 @@ The `applications` key holds categories you wish to add to programs. This key is
     "urxvt": "TerminalEmulator"
 ```
 
+### `categories`
+
+```
+"categories": {
+	"CATEGORY": ["NAME", "PRIORITY"],
+	"CATEGORY": ["NAME", "PRIORITY"],
+	...
+}
+```
+
 The `categories` key holds arrays of length `2`. The name of each array is the name of a category. The array contains:
 
 * 1. A string containing the name to assign to the category
 * 2. An integer known as the priority. When multiple categories are found for a single desktop, the category with the lowest priority will take precedence.
 
 The default `desknamer.json` sets the name of common categories to icons from the [Nerd Fonts](https://nerdfonts.com), as well as sets some sane default priorities.
+
+### `indexes`
+
+```
+"indexes": {
+	"NUMBER": "NAME",
+	"NUMBER": "NAME",
+	...
+}
+```
+
+When `desknamer` finds no windows open in a desktop, it names it based on that desktop's index in its monitor. The first desktop is named `1`, the second `2`, and so on. Using the optional `indexes` key, you can force `desknamer` to use a certain name for any index instead of just a plain number.
+
+A good use of this key is when you want regular numbers to be replaced with a set of corresponding icons, or foreign characters, e.g. Japanese:
+
+```
+"indexes": {
+	"1": "一"
+	"2": "二"
+	"3": "三"
+	...
+}
+```
 
 ## How Categories are Found
 
@@ -88,7 +116,6 @@ Fortunately for us, most applications installed on your system have a `.desktop`
 * Categories
 
 These categories allow `desknamer` to know what type of application it's looking at. However, not all programs have corresponding `.desktop` files or a `Categories` entry.
-
 
 ### Priorities and Naming Schemes
 

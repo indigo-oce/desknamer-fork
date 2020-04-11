@@ -45,63 +45,73 @@ getCategories() {
 	done
 }
 
-renameDesktop() {
-	local desktopID="$1"
-	monitorID="$(bspc query --desktop "$desktopID" --monitors)"
-
-	if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ] || [ "${desktopBlacklist#*$monitorID}" != "$desktopBlacklist" ]; then
-		echo -e " - Not renaming desktopID: $desktopID\n"
-		return 0
-	fi
-	echo " - Renaming desktopID: $desktopID"
-
-	desktopName="$(bspc query --names --desktop "$desktopID" --desktops)"
-	echo -e " -- Current Desktop Name: ${GREEN}$desktopName ${R}"
-
-	((verbose)) && echo " -- monitorID: $monitorID"
-
-	desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
-	echo " -- desktopIndex: $desktopIndex"
-
-	# for node in this desktop, get children processes and categories
-	desktopCategories=()
-	children=()
-	IFS=$'\n'
-	for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
-		pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
-		[ -n "$pid" ] && getCategories "$pid"
-
-		((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
-	done
-
-	((verbose)) && echo -e " -- All Processes:\n${children[@]}"
-
-	# check programs against custom list of categories
+renameDesktops() {
+	local desktopIDs="$@"
 	IFS=' '
-	for comm in ${children[@]}; do
-		desktopCategories+=("$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")")
-	done
+	for desktopID in $desktopIDs; do
+		monitorID="$(bspc query --desktop "$desktopID" --monitors)"
 
-	echo -e " -- All Categories Found:\n${desktopCategories[@]}\n"
-
-	# check config for name with lowest priority
-	name=""
-	minPriority=100
-	IFS=' '
-	for category in ${desktopCategories[@]}; do
-		priority="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][1])" <<< "$config")"
-		if [ -n "$priority" ] && [ $(echo "$priority < $minPriority" | bc -l) -eq 1 ]; then
-			minPriority="$priority"
-			name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][0])" <<< "$config")"
+		if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ] || [ "${desktopBlacklist#*$monitorID}" != "$desktopBlacklist" ]; then
+			echo -e " - Not renaming desktopID: $desktopID\n"
+			return 0
 		fi
+		echo " - Renaming desktopID: $desktopID"
+
+		desktopName="$(bspc query --names --desktop "$desktopID" --desktops)"
+		echo -e " -- Current Desktop Name: ${GREEN}$desktopName ${R}"
+
+		((verbose)) && echo " -- monitorID: $monitorID"
+
+		desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
+		echo " -- desktopIndex: $desktopIndex"
+
+		# for node in this desktop, get children processes and categories
+		desktopCategories=()
+		children=()
+		IFS=$'\n'
+		for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
+			pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
+			[ -n "$pid" ] && getCategories "$pid"
+
+			((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
+		done
+
+		((verbose)) && echo -e " -- All Processes:\n${children[@]}"
+
+		# check programs against custom list of categories
+		IFS=' '
+		for comm in ${children[@]}; do
+			desktopCategories+=("$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")")
+		done
+
+		echo -e " -- All Categories Found:\n${desktopCategories[@]}\n"
+
+		# check config for name with lowest priority
+		name=""
+		minPriority=100
+		IFS=' '
+		for category in ${desktopCategories[@]}; do
+			priority="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][1])" <<< "$config")"
+			if [ -n "$priority" ] && [ $(echo "$priority < $minPriority" | bc -l) -eq 1 ]; then
+				minPriority="$priority"
+				name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][0])" <<< "$config")"
+			fi
+		done
+
+		## fallback names
+
+		# existing programs, but none recognized
+		[ -z "$name" ] && [ "${#children[@]}" -gt 0 ] && name=""
+
+		# or, find custom index name
+		[ -z "$name" ] && name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['indexes']['$desktopIndex'])" <<< "$config")"
+
+		# or, just plain index
+		[ -z "$name" ] && name="$desktopIndex"	# no applications
+
+		echo -e " -- New Name: ${BLUE}$name ${R}\n"
+		bspc desktop "$desktopID" --rename "$name"
 	done
-
-	# fallback names
-	[ -z "$name" ] && [ "${#children[@]}" -gt 0 ] && name=""	# no recognized applications
-	[ -z "$name" ] && name="$desktopIndex"	# no applications
-
-	echo -e " -- New Name: ${BLUE}$name ${R}\n"
-	bspc desktop "$desktopID" --rename "$name"
 }
 
 renameMonitor() {
@@ -113,7 +123,7 @@ renameMonitor() {
 	fi
 	echo "Renaming monitor: $monitorID"
 	IFS=$'\n'
-	for desktop in $(bspc query -m "$monitorID" -D); do renameDesktop "$desktop"; done
+	for desktop in $(bspc query -m "$monitorID" -D); do renameDesktops "$desktop"; done
 }
 
 renameAll() {
@@ -129,10 +139,10 @@ monitor() {
 		case "$line" in
 			monitor*) renameAll ;;
 			desktop_add*|desktop_remove*) renameAll ;;
-			desktop_swap*) renameDesktop "$(echo "$line" | awk '{print $3,$5}')" ;;
-			desktop_transfer*) renameDesktop "$(echo "$line" | awk '{print $3}')" ;;
-			node_add*|node_remove*) renameDesktop "$(echo "$line" | awk '{print $3}')" ;;
-			node_swap*|node_transfer*) renameDesktop "$(echo "$line" | awk '{print $3,$6}')" ;;
+			desktop_swap*) renameDesktops "$(echo "$line" | awk '{print $3,$5}')" ;;
+			desktop_transfer*) renameDesktops "$(echo "$line" | awk '{print $3}')" ;;
+			node_add*|node_remove*) renameDesktops "$(echo "$line" | awk '{print $3}')" ;;
+			node_swap*|node_transfer*) renameDesktops "$(echo "$line" | awk '{print $3,$6}')" ;;
 		esac
 	done
 }

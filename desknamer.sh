@@ -159,8 +159,8 @@ python=0
 children=()
 desktopCategories=()
 
-OPTS="hac:ns:g:M:d:D:v"	# colon (:) means it requires a subsequent value
-LONGOPTS="help,all,config:,categories,norecursive,search:,get:,verbose,monitor-blacklist:,desktop-blacklist:"
+OPTS="hc:nvM:D:lLs:g:"	# colon (:) means it requires a subsequent value
+LONGOPTS="help,config:,norecursive,verbose,monitor-blacklist:,desktop-blacklist:,list-applications,list-categories,search:,get:"
 
 parsed=$(getopt --options=$OPTS --longoptions=$LONGOPTS -- "$@")
 eval set -- "${parsed[@]}"
@@ -169,23 +169,16 @@ while true; do
 	case "$1" in
 		-h|--help) flag_h=1; shift ;;
 		-c|--config) configFile="$2"; shift 2 ;;
-		-a|--all) mode="getAllApplications"; shift ;;
-		-c|--categories) mode="getAllCategories"; shift ;;
 		-n|--norecursive) recursive=0; shift ;;
 		-v|--verbose) verbose=1; shift ;;
+
 		-M|--monitor-blacklist) monitorBlacklistIn="$2"; shift 2 ;;
 		-D|--desktop-blacklist) desktopBlacklistIn="$2"; shift 2 ;;
-		-s|--search)
-			mode="search"
-			application="$2"
-			shift 2
-			;;
 
-		-g|--get)
-			mode="get"
-			application="$2"
-			shift 2
-			;;
+		-l|--list-applications) mode="getAllApplications"; shift ;;
+		-L|--list-categories) mode="getAllCategories"; shift ;;
+		-s|--search) mode="search"; application="$2"; shift 2 ;;
+		-g|--get) mode="get"; application="$2"; shift 2 ;;
 
 		--) shift; break ;;
 		*)
@@ -201,18 +194,18 @@ Usage: desknamer [OPTIONS]
 desknamer.sh monitors your open desktops and renames them according to what's inside.
 
 optional args:
-  -c, --config FILE     path to alternate configuration file
-  -n, --norecursive     don't inspect windows recursively
+  -c, --config FILE       path to alternate configuration file
+  -n, --norecursive       don't inspect windows recursively
   -M \"MONITOR [MONITOR2]...\"
-                        specify monitor names or IDs to ignore
+                          specify monitor names or IDs to ignore
   -D \"DESKTOP [DESKTOP2]...\"
-                        specify desktop names or IDs to ignore
-  -a, --all             print all applications found on your machine
-      --categories      print all categories found on your machine
-  -s, --search PROGRAM  find .desktop files matching *program*.desktop
-  -g, --get PROGRAM     get categories for given program
-  -v, --verbose         make output more verbose
-  -h, --help            show help"
+                          specify desktop names or IDs to ignore
+  -l, --list-applications  print all applications found on your machine
+  -L, --list-categories   print all categories found on your machine
+  -s, --search PROGRAM    find .desktop files matching *program*.desktop
+  -g, --get PROGRAM       get categories for given program
+  -v, --verbose           make output more verbose
+  -h, --help              show help"
 
 # convert {monitor,desktop} names to ids
 IFS=' '

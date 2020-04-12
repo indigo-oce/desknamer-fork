@@ -27,21 +27,19 @@ Usage: desknamer [OPTIONS]
 desknamer.sh monitors your open desktops and renames them according to what's inside.
 
 optional args:
-  -c, --config FILE     path to alternate configuration file
-  -n, --norecursive     don't inspect windows recursively
+  -c, --config FILE       path to alternate configuration file
+  -n, --norecursive       don't inspect windows recursively
   -M "MONITOR [MONITOR2]..."
-                        specify monitor names or IDs to ignore
+                          specify monitor names or IDs to ignore
   -D "DESKTOP [DESKTOP2]..."
-                        specify desktop names or IDs to ignore
-  -a, --all             print all applications found on your machine
-      --categories      print all categories found on your machine
-  -s, --search PROGRAM  find .desktop files matching *program*.desktop
-  -g, --get PROGRAM     get categories for given program
-  -v, --verbose         make output more verbose
-  -h, --help            show help
+                          specify desktop names or IDs to ignore
+  -l, --list-applications  print all applications found on your machine
+  -L, --list-categories   print all categories found on your machine
+  -s, --search PROGRAM    find .desktop files matching *program*.desktop
+  -g, --get PROGRAM       get categories for given program
+  -v, --verbose           make output more verbose
+  -h, --help              show help
 ```
-
-Since `desknamer` is designed to be ran as a daemon, you'll want to run it in the background like so:
 
 ```bash
 desknamer &
@@ -49,27 +47,27 @@ desknamer &
 
 ## Configuration File
 
-`desknamer` looks for a config file at `~/config/desknamer/desknamer.json` by default, but this can be specified with -c. The configuration file is a JSON file with several keys.
+`desknamer` looks for a config file at `~/config/desknamer/desknamer.json` by default, but this can be specified with `-c` or `--config`. The configuration file is a JSON file with several keys:
 
 ### `applications`
 
-```
+```json
 "applications": {
 	"APPLICATION": "CATEGORY",
 	"APPLICATION": "CATEGORY",
 	...
 }
-```
+```json
 
 The `applications` key holds categories you wish to add to programs. This key is useful when a given program doesn't have categories at all, or is missing a category you think it should have. At this time, only 1 category can be added to any particular application. E.g:
 
-```
+```json
     "urxvt": "TerminalEmulator"
 ```
 
 ### `categories`
 
-```
+```json
 "categories": {
 	"CATEGORY": ["NAME", "PRIORITY"],
 	"CATEGORY": ["NAME", "PRIORITY"],
@@ -79,14 +77,14 @@ The `applications` key holds categories you wish to add to programs. This key is
 
 The `categories` key holds arrays of length `2`. The name of each array is the name of a category. The array contains:
 
-* 1. A string containing the name to assign to the category
-* 2. An integer known as the priority. When multiple categories are found for a single desktop, the category with the lowest priority will take precedence.
+1. A string containing the name to assign to the category
+2. An integer known as the priority. When multiple categories are found for a single desktop, the category with the lowest priority will take precedence.
 
 The default `desknamer.json` sets the name of common categories to icons from the [Nerd Fonts](https://nerdfonts.com), as well as sets some sane default priorities.
 
 ### `indexes`
 
-```
+```json
 "indexes": {
 	"NUMBER": "NAME",
 	"NUMBER": "NAME",
@@ -98,7 +96,7 @@ When `desknamer` finds no windows open in a desktop, it names it based on that d
 
 A good use of this key is when you want regular numbers to be replaced with a set of corresponding icons, or foreign characters, e.g. Japanese:
 
-```
+```json
 "indexes": {
 	"1": "一"
 	"2": "二"

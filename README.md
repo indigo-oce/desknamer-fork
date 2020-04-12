@@ -57,12 +57,12 @@ desknamer &
 	"APPLICATION": "CATEGORY",
 	...
 }
-```json
+```
 
 The `applications` key holds categories you wish to add to programs. This key is useful when a given program doesn't have categories at all, or is missing a category you think it should have. At this time, only 1 category can be added to any particular application. E.g:
 
 ```json
-    "urxvt": "TerminalEmulator"
+	"urxvt": "TerminalEmulator"
 ```
 
 ### `categories`

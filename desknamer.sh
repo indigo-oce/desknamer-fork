@@ -18,14 +18,23 @@ searchApplications() {
 	{ find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop || head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop; } 2>/dev/null | head -1
 }
 
-getCategory() {
+getCategoryComm() {
 	local comm="$1"
 	if [ -z "${comm##*/*}" ]; then
 		menuItem="$comm"
 	else
 		menuItem="$(searchApplications "$comm")"
 	fi
-	[ -n "$menuItem" ] && desktopCategories+=($(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem"))
+	[ -n "$menuItem" ] && desktopCategories+=($(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")) || return 1
+}
+
+getCategoryNode() {
+	node="$1"
+
+	IFS=' '
+	for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2); do
+		getCategoryComm "$(sed 's/.*"\(.*\)".*/\1/' <<< "$class")"
+	done
 }
 
 getCategories() {
@@ -36,12 +45,12 @@ getCategories() {
 	[ -z "$comm" ] && return
 	children+=("$comm")
 
-	getCategory "$comm"
-
 	IFS=$'\n'
 	((recursive)) && for childPid in "$(ps -o pid= --ppid "$pid" 2>/dev/null)"; do
 		getCategories "$childPid"
 	done
+
+	getCategoryComm "$comm" || return 1
 }
 
 renameDesktops() {
@@ -73,14 +82,12 @@ renameDesktops() {
 			[ "$pid" == "found." ] && pid=""
 			((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
 
+
+			# try using pid to get categories, otherwise try node's WM_CLASS property
 			if [ -n "$pid" ]; then
-				getCategories "$pid"
+				getCategories "$pid" || getCategoryNode "$node"
 			else
-				# if pid is empty, try getting WM_CLASS and basing categories on that
-				IFS=' '
-				for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2); do
-					getCategory "$(sed 's/.*"\(.*\)".*/\1/' <<< "$class")"
-				done
+				getCategoryNode "$node"
 			fi
 
 		done
@@ -243,5 +250,5 @@ case "$mode" in
 	list-categories) getAllCategories ;;
 	monitor) monitor ;;
 	search) find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "*$application"*.desktop 2>/dev/null ;;
-	get) getCategory "$application" ;;
+	get) getCategoryComm "$application" ;;
 esac

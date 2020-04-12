@@ -7,6 +7,7 @@
 		"urxvt": "TerminalEmulator"
 	},
 	"categories": {
+		"default": ["", 0],
 		"firefox": ["", 10],
 		"WebBrowser": ["", 12],
 		"Documentation": ["", 14],

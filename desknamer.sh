@@ -117,7 +117,7 @@ renameDesktops() {
 		## fallback names
 
 		# existing programs, but none recognized
-		[ -z "$name" ] && [ "${#children[@]}" -gt 0 ] && name=""
+		[ -z "$name" ] && [ "${#children[@]}" -gt 0 ] && { name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['default'][0])" <<< "$config")" || name="Default"; }
 
 		# or, find custom index name
 		[ -z "$name" ] && name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['indexes']['$desktopIndex'])" <<< "$config")"

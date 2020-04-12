@@ -5,18 +5,12 @@ GREEN='\e[32m'
 RED='\e[31m'
 R='\e[0m'
 
-getAllApplications() {
-	for application in "$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null)"; do
-		echo "$application"
-	done
-}
+getAllApplications() { find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null; }
 
-getAllCategories() {
-	sed -n 's/;/ /g; s/^Categories=//p' $(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null)
-}
+getAllCategories() { sed -n 's/;/ /g; s/ /\n/g; s/^Categories=//p' $(getAllApplications) | sort -u; }
 
 searchApplications() {
-	find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop 2>/dev/null | head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop 2>/dev/null | head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop 2>/dev/null | head -1
+	{ find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop || head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop; } 2>/dev/null | head -1
 }
 
 getCategory() {

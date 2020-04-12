@@ -80,7 +80,7 @@ The `categories` key holds arrays of length `2`. The name of each array is the n
 1. A string containing the name to assign to the category
 2. An integer known as the priority. When multiple categories are found for a single desktop, the category with the lowest priority will take precedence.
 
-In addition, the `default` category will be used when a desktop has applications open, but no categories are matched.
+In addition, the `default` category will be used when a desktop has applications open, but no categories are matched. If a `default` category is not found, an asterisk (`*`) will be used.
 
 The default `desknamer.json` sets the name of common categories to icons from the [Nerd Fonts](https://nerdfonts.com), as well as sets some sane default priorities.
 
@@ -122,7 +122,7 @@ These categories allow `desknamer` to know what type of application it's looking
 `desknamer` names each desktop based on what information it is able to find about nodes (windows) inside:
 
 * **No nodes present**: name is desktop's index on its monitor (e.g. 4), unless a custom name has been specified in the `indexes` key of the configuration file
-* **Node(s) present, no categories found**: name is a generic name that represents the presence of unknown applications, unless a custom name has been specified for the `default` category
+* **Node(s) present, no categories found**: the desktop will be given the `default` category name, specified in the configuration file. If the `default` category name is not specified, an asterisk (`*`) will be used.
 * **1 category found**: named that category's name (specified in the configuration file)
 * **>1 category found**: `desknamer` checks the priority of each competing category in the configuration file, and the category with the lowest priority is determined to take precedence for the whole desktop. The desktop is named the preceding category's name (specified in the configuration file).
 

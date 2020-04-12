@@ -119,7 +119,7 @@ These categories allow `desknamer` to know what type of application it's looking
 
 `desknamer` names each desktop based on what information it is able to find about nodes (windows) inside:
 
-* **No nodes present**: name is desktop's index on its monitor (e.g. 4)
+* **No nodes present**: name is desktop's index on its monitor (e.g. 4), unless a custom name has been specified in the `indexes` key of the configuration file
 * **Node(s) present, no categories found**: name is a generic name that represents the presence of unknown applications
 * **1 category found**: named that category's name (specified in the configuration file)
 * **>1 category found**: `desknamer` checks the priority of each competing category in the configuration file, and the category with the lowest priority is determined to take precedence for the whole desktop. The desktop is named the preceding category's name (specified in the configuration file).

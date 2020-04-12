@@ -7,7 +7,12 @@ R='\e[0m'
 
 getAllApplications() { find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null; }
 
-getAllCategories() { sed -n 's/;/ /g; s/ /\n/g; s/^Categories=//p' $(getAllApplications) | sort -u; }
+getAllCategories() {
+	IFS=$'\n'
+	for menuItem in $(getAllApplications); do
+		sed -n 's/;/ /g; s/ /\n/g; s/^Categories=//p' < "$menuItem"
+	done | sort -u
+}
 
 searchApplications() {
 	{ find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop || head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop; } 2>/dev/null | head -1
@@ -179,8 +184,8 @@ while true; do
 		-M|--monitor-blacklist) monitorBlacklistIn="$2"; shift 2 ;;
 		-D|--desktop-blacklist) desktopBlacklistIn="$2"; shift 2 ;;
 
-		-l|--list-applications) mode="getAllApplications"; shift ;;
-		-L|--list-categories) mode="getAllCategories"; shift ;;
+		-l|--list-applications) mode="list-applications"; shift ;;
+		-L|--list-categories) mode="list-categories"; shift ;;
 		-s|--search) mode="search"; application="$2"; shift 2 ;;
 		-g|--get) mode="get"; application="$2"; shift 2 ;;
 
@@ -234,8 +239,8 @@ fi
 config="$(cat "$configFile")"
 
 case "$mode" in
-	getAllApplications) getAllApplications ;;
-	getAllCategories) getAllCategories ;;
+	list-applications) getAllApplications ;;
+	list-categories) getAllCategories ;;
 	monitor) monitor ;;
 	search) find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "*$application"*.desktop 2>/dev/null ;;
 	get) getCategory "$application" ;;

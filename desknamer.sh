@@ -14,11 +14,11 @@ searchApplications() {
 }
 
 getCategory() {
-	local application="$1"
-	if [ -z "${application##*/*}" ]; then
-		menuItem="$application"
+	local comm="$1"
+	if [ -z "${comm##*/*}" ]; then
+		menuItem="$comm"
 	else
-		menuItem="$(searchApplications "$application")"
+		menuItem="$(searchApplications "$comm")"
 	fi
 	[ -n "$menuItem" ] && desktopCategories+=($(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem"))
 }
@@ -65,9 +65,19 @@ renameDesktops() {
 		IFS=$'\n'
 		for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
 			pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
-			[ -n "$pid" ] && getCategories "$pid"
-
+			[ "$pid" == "found." ] && pid=""
 			((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
+
+			if [ -n "$pid" ]; then
+				getCategories "$pid"
+			else
+				# if pid is empty, try getting WM_CLASS and basing categories on that
+				IFS=' '
+				for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2); do
+					getCategory "$(sed 's/.*"\(.*\)".*/\1/' <<< "$class")"
+				done
+			fi
+
 		done
 
 		((verbose)) && echo -e " -- All Processes:\n${children[@]}"

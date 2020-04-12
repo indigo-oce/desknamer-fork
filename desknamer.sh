@@ -250,5 +250,8 @@ case "$mode" in
 	list-categories) getAllCategories ;;
 	monitor) monitor ;;
 	search) find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "*$application"*.desktop 2>/dev/null ;;
-	get) getCategoryComm "$application" ;;
+	get)
+		getCategoryComm "$application"
+		echo "${desktopCategories[@]}"
+		;;
 esac

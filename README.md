@@ -14,7 +14,7 @@ ln -s ~/bin/desknamer/desknamer.sh ~/.local/bin/desknamer
 
 To copy the sample configuration file:
 
-```
+```bash
 mkdir -p ~/.config/desknamer
 cp ~/bin/desknamer/desknamer.json ~/.config/desknamer/desknamer.json
 ```
@@ -40,6 +40,8 @@ optional args:
   -v, --verbose           make output more verbose
   -h, --help              show help
 ```
+
+`desknamer` is meant to be run in the background as a daemon like so:
 
 ```bash
 desknamer &

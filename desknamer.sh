@@ -59,7 +59,7 @@ getCategories() {
 
 	# get categories recursively for this pid
 	IFS=$'\n'
-	((recursive)) && for childPid in $(ps -o pid= --ppid "$pid" 2>/dev/null); do
+	((recursive)) && for childPid in $(ps -o pid:1= --ppid "$pid" 2>/dev/null | tr -d '[:space:]'); do
 		getCategories "$childPid"
 	done
 
@@ -95,14 +95,12 @@ renameDesktops() {
 			[ "$pid" == "found." ] && pid=""
 			((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
 
-
 			# try using pid to get categories, otherwise try node's WM_CLASS property
 			if [ -n "$pid" ]; then
 				getCategories "$pid" || getCategoryNode "$node"
 			else
 				getCategoryNode "$node"
 			fi
-
 		done
 
 		((verbose)) && echo -e " -- All Processes: ${children[@]}"

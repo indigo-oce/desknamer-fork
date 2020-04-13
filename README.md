@@ -2,6 +2,10 @@
 
 `desknamer.sh` is a daemon that intelligently renames open `bspwm` desktops according to the applications open inside.
 
+![preview](preview.gif)
+
+> Shown: Firefox (custom category), vlc (Player), qt5ct (Settings), alacritty (TerminalEmulator), Vim (TextEditor)
+
 ## Installation
 
 To clone to `~/bin/desknamer`, make executable, and add to available commands:

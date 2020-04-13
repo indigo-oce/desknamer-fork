@@ -20,12 +20,23 @@ searchApplications() {
 
 getCategoryComm() {
 	local comm="$1"
+
+	# if input contains a slash, it's likely a path to a menu item (.desktop file)
 	if [ -z "${comm##*/*}" ]; then
 		menuItem="$comm"
 	else
 		menuItem="$(searchApplications "$comm")"
 	fi
-	[ -n "$menuItem" ] && desktopCategories+=($(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")) || return 1
+	if [ -n "$menuItem" ]; then
+		# grab categories from Categories= line and add to list
+		categories=$(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")
+		[ -z "$categories" ] && return 1
+
+		desktopCategories+=($categories)
+		((verbose)) && echo " ---- Added Categories: $categories"
+	else
+		return 1
+	fi
 }
 
 getCategoryNode() {
@@ -44,7 +55,9 @@ getCategories() {
 	local comm="$({ tr '\0' '\n' < "/proc/$pid/comm"; } 2>/dev/null)"
 	[ -z "$comm" ] && return
 	children+=("$comm")
+	((verbose)) && echo " --- PID, COMM: $pid, $comm"
 
+	# get categories recursively for this pid
 	IFS=$'\n'
 	((recursive)) && for childPid in $(ps -o pid= --ppid "$pid" 2>/dev/null); do
 		getCategories "$childPid"
@@ -92,15 +105,18 @@ renameDesktops() {
 
 		done
 
-		((verbose)) && echo -e " -- All Processes:\n${children[@]}"
+		((verbose)) && echo -e " -- All Processes: ${children[@]}"
 
 		# check programs against custom list of categories
 		IFS=' '
 		for comm in ${children[@]}; do
-			desktopCategories+=("$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")")
+			categories="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")"
+			[ -z "$categories" ] && continue
+			desktopCategories+=($categories)
+			echo " ---- Added Custom Category: $categories"
 		done
 
-		echo -e " -- All Categories Found:\n${desktopCategories[@]}\n"
+		echo -e " -- All Categories Found: ${desktopCategories[@]}\n"
 
 		# check config for name with lowest priority
 		name=""

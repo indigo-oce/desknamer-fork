@@ -103,7 +103,8 @@ renameDesktops() {
 			fi
 		done
 
-		((verbose)) && echo -e " -- All Processes: ${children[@]}"
+		children=($(tr ' ' '\n' <<< "${children[@]}" | sort -u | tr '\n' ' '))
+		echo " -- Unique Processes: ${children[@]}"
 
 		# check programs against custom list of categories
 		IFS=' '
@@ -114,7 +115,8 @@ renameDesktops() {
 			echo " ---- Added Custom Category: $categories"
 		done
 
-		echo -e " -- All Categories Found: ${desktopCategories[@]}\n"
+		desktopCategories=($(tr ' ' '\n' <<< "${desktopCategories[@]}" | sort -u | tr '\n' ' '))
+		echo -e " -- Unique Categories: ${desktopCategories[@]}"
 
 		# check config for name with lowest priority
 		name=""

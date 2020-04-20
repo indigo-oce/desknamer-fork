@@ -103,7 +103,7 @@ renameDesktops() {
 			fi
 		done
 
-		children=($(tr ' ' '\n' <<< "${children[@]}" | sort -u | tr '\n' ' '))
+		[ "${#children[@]}" -gt 0 ] && children=($(tr ' ' '\n' <<< "${children[@]}" | sort -u | tr '\n' ' '))
 		echo " -- Unique Processes: ${children[@]}"
 
 		# check programs against custom list of categories

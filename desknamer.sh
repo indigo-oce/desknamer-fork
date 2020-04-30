@@ -40,7 +40,7 @@ getCategory() {
 		categories=$(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")
 		if [ -n "$categories" ]; then
 			desktopCategories+=($categories)
-			((verbose)) && echo -e " ├── [$comm] ${GREEN}Added Categories:${RESET} $categories"
+			((verbose)) && echo -e " ├── [$comm] ${GREEN}Added categories:${RESET} $categories"
 			return 0
 		else
 			((verbose)) && echo -e " ├── [$comm] ${RED}No categories found.${RESET}"
@@ -76,7 +76,7 @@ addClasses() {
 		class="$(cut -d '=' -f 2 <<< "$class" | sed 's/.*"\(.*\)".*/\1/')"
 		if [ -n "$class" ]; then
 			processList+=("$class")
-			((verbose)) && echo -e " ├── ${GREEN}Found${RESET} [$class] via WM_CLASS Property"
+			((verbose)) && echo -e " ├── ${GREEN}Found${RESET} [$class] via WM_CLASS property"
 			returnValue=0
 		fi
 	done
@@ -133,8 +133,8 @@ renameDesktops() {
 			inspectNode "$node"
 		done
 
-		# filter out duplicates from processList, ignoring case
-		[ "${#processList[@]}" -gt 0 ] && processList=($(tr ' ' '\n' <<< "${processList[@]}" | sort -fu | tr '\n' ' '))
+		# filter out duplicate process names
+		[ "${#processList[@]}" -gt 0 ] && processList=($(tr ' ' '\n' <<< "${processList[@]}" | sort -u | tr '\n' ' '))
 		echo " ├─ Unique Process Names: ${processList[@]}"
 
 		# check programs against custom list of categories

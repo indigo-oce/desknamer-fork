@@ -20,7 +20,7 @@ findMenuItem() {
 	local menuItem=""
 
 	# start specific, then get desperate for any matches
-	for expression in "$1" "*$1" "*$1*"; do
+	for expression in "$1" "*$1"; do
 		menuItem="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$expression".desktop 2>/dev/null)"
 		[ -n "$menuItem" ] && break
 	done

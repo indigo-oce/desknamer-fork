@@ -68,12 +68,10 @@ inspectNode() {
 addClasses() {
 	node="$1"
 
-	returnValue=1
-	# FIXME: doesn't work when multiple classes exist
 	# get WM_CLASS window property
-	for class in "$(xprop -id "$node" WM_CLASS 2>/dev/null)"; do
-		[ $? -ne 0 ] && break
-		class="$(cut -d '=' -f 2 <<< "$class" | sed 's/.*"\(.*\)".*/\1/')"
+	returnValue=1
+	IFS=$'\n'
+	for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2 | sed 's/, /\n/g; s/.*"\(.*\)".*/\1/gm'); do
 		if [ -n "$class" ]; then
 			processList+=("$class")
 			((verbose)) && echo -e " ├── ${GREEN}Found${RESET} [$class] via WM_CLASS property"

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-BLUE='\e[34m'
-GREEN='\e[32m'
+RESET='\e[0m'
 RED='\e[31m'
-R='\e[0m'
+GREEN='\e[32m'
+ORANGE='\e[33m'
+BLUE='\e[34m'
 
 getAllApplications() { find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *.desktop 2>/dev/null; }
 
@@ -14,27 +15,40 @@ getAllCategories() {
 	done | sort -u
 }
 
-searchApplications() {
-	{ find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$1".desktop || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1".desktop || head -1 || find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$1"*.desktop; } 2>/dev/null | head -1
+findMenuItem() {
+	local menuItem=""
+	# start specific then get desperate for any matches
+	for expression in "$1" "*$1" "*$1*"; do
+		menuItem="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$expression".desktop 2>/dev/null)"
+		[ -n "$menuItem" ] && break
+	done
+	echo "$menuItem" | head -n 1
 }
 
 getCategoryComm() {
 	local comm="$1"
+	children+=("$comm")
 
 	# if input contains a slash, it's likely a path to a menu item (.desktop file)
 	if [ -z "${comm##*/*}" ]; then
 		menuItem="$comm"
 	else
-		menuItem="$(searchApplications "$comm")"
+		menuItem="$(findMenuItem "$comm")"
 	fi
 	if [ -n "$menuItem" ]; then
+		((verbose)) && echo -e " ├─── [$comm] ${GREEN}Found menu item:${RESET} $menuItem"
 		# grab categories from Categories= line and add to list
 		categories=$(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")
-		[ -z "$categories" ] && return 1
+		if [ -z "$categories" ]; then
+			((verbose)) && echo -e " ├──── [$comm] ${RED}No categories found.${RESET}"
+			return 1
+		fi
 
 		desktopCategories+=($categories)
-		((verbose)) && echo " ---- Added Categories: $categories"
+		((verbose)) && echo -e " ├─── [$comm] ${GREEN}Added Categories:${RESET} $categories"
+		return 0
 	else
+		echo -e " ├──── [$comm] ${RED}No menu item found${RESET}"
 		return 1
 	fi
 }
@@ -43,8 +57,11 @@ getCategoryNode() {
 	node="$1"
 
 	IFS=' '
-	for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2); do
-		getCategoryComm "$(sed 's/.*"\(.*\)".*/\1/' <<< "$class")"
+	for class in "$(xprop -id "$node" WM_CLASS 2>/dev/null)"; do
+		[ $? -ne 0 ] && break
+		class="$(cut -d '=' -f 2 <<< "$class" | sed 's/.*"\(.*\)".*/\1/')"
+		echo -e " ---- ${ORANGE}Nothing found, trying WM_CLASS:${RESET} $class"
+		getCategoryComm "$class"
 	done
 }
 
@@ -54,8 +71,7 @@ getCategories() {
 	# accessing process file is faster than ps
 	local comm="$({ tr '\0' '\n' < "/proc/$pid/comm"; } 2>/dev/null)"
 	[ -z "$comm" ] && return
-	children+=("$comm")
-	((verbose)) && echo " --- PID, COMM: $pid, $comm"
+	((verbose)) && echo -e " ├─── Found [$comm] PID: $pid"
 
 	# get categories recursively for this pid
 	IFS=$'\n'
@@ -73,18 +89,18 @@ renameDesktops() {
 		monitorID="$(bspc query --desktop "$desktopID" --monitors)"
 
 		if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ] || [ "${desktopBlacklist#*$monitorID}" != "$desktopBlacklist" ]; then
-			echo -e " - Not renaming desktopID: $desktopID\n"
+			echo -e " └ Not renaming desktopID: $desktopID\n"
 			return 0
 		fi
-		echo " - Renaming desktopID: $desktopID"
+		echo " ├ Renaming desktopID: $desktopID"
 
 		desktopName="$(bspc query --names --desktop "$desktopID" --desktops)"
-		echo -e " -- Current Desktop Name: ${GREEN}$desktopName ${R}"
+		echo -e " ├─ Current Desktop Name: ${GREEN}$desktopName ${RESET}"
 
-		((verbose)) && echo " -- monitorID: $monitorID"
+		((verbose)) && echo " ├── monitorID: $monitorID"
 
 		desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
-		echo " -- desktopIndex: $desktopIndex"
+		echo " ├─ desktopIndex: $desktopIndex"
 
 		# for node in this desktop, get children processes and categories
 		desktopCategories=()
@@ -93,7 +109,7 @@ renameDesktops() {
 		for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
 			pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
 			[ "$pid" == "found." ] && pid=""
-			((verbose)) && echo " -- Node [PID]: $node [${pid:-NONE}]"
+			((verbose)) && echo " ├─ Node ID: $node [PID: ${pid:-NONE}]"
 
 			# try using pid to get categories, otherwise try node's WM_CLASS property
 			if [ -n "$pid" ]; then
@@ -104,7 +120,7 @@ renameDesktops() {
 		done
 
 		[ "${#children[@]}" -gt 0 ] && children=($(tr ' ' '\n' <<< "${children[@]}" | sort -u | tr '\n' ' '))
-		echo " -- Unique Processes: ${children[@]}"
+		echo " ├─ Unique Processes: ${children[@]}"
 
 		# check programs against custom list of categories
 		IFS=' '
@@ -112,11 +128,11 @@ renameDesktops() {
 			categories="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")"
 			[ -z "$categories" ] && continue
 			desktopCategories+=($categories)
-			echo " ---- Added Custom Category: $categories"
+			echo " ──── Added Custom Category: $categories"
 		done
 
 		desktopCategories=($(tr ' ' '\n' <<< "${desktopCategories[@]}" | sort -u | tr '\n' ' '))
-		echo -e " -- Unique Categories: ${desktopCategories[@]}"
+		echo -e " ├─ Unique Categories: ${desktopCategories[@]}"
 
 		# check config for name with lowest priority
 		name=""
@@ -141,7 +157,7 @@ renameDesktops() {
 		# or, just plain index
 		[ -z "$name" ] && name="$desktopIndex"	# no applications
 
-		echo -e " -- New Name: ${BLUE}$name ${R}\n"
+		echo -e " └─ New Name: ${BLUE}$name ${RESET}\n"
 		bspc desktop "$desktopID" --rename "$name"
 	done
 }
@@ -167,7 +183,7 @@ renameAll() {
 monitor() {
 	bspc subscribe monitor_add monitor_remove monitor_swap desktop_add desktop_remove desktop_swap desktop_transfer node_add node_remove node_swap node_transfer | while read -r line; do	# trigger on any bspwm event
 
-		echo -e "${RED}trigger:${R} $line"
+		echo -e "${RED}trigger:${RESET} $line"
 		case "$line" in
 			monitor*) renameAll ;;
 			desktop_add*|desktop_remove*) renameAll ;;
@@ -265,7 +281,7 @@ case "$mode" in
 	list-applications) getAllApplications ;;
 	list-categories) getAllCategories ;;
 	monitor) monitor ;;
-	search) find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "*$application"*.desktop 2>/dev/null ;;
+	search) find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$application"*.desktop 2>/dev/null ;;
 	get)
 		getCategoryComm "$application"
 		echo "${desktopCategories[@]}"

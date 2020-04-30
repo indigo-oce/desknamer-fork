@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 RESET='\e[0m'
+BOLD='\e[;1m'
 RED='\e[31m'
 GREEN='\e[32m'
 ORANGE='\e[33m'
@@ -17,7 +18,8 @@ getAllCategories() {
 
 findMenuItem() {
 	local menuItem=""
-	# start specific then get desperate for any matches
+
+	# start specific, then get desperate for any matches
 	for expression in "$1" "*$1" "*$1*"; do
 		menuItem="$(find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname "$expression".desktop 2>/dev/null)"
 		[ -n "$menuItem" ] && break
@@ -25,61 +27,82 @@ findMenuItem() {
 	echo "$menuItem" | head -n 1
 }
 
-getCategoryComm() {
+getCategory() {
 	local comm="$1"
-	children+=("$comm")
 
-	# if input contains a slash, it's likely a path to a menu item (.desktop file)
-	if [ -z "${comm##*/*}" ]; then
-		menuItem="$comm"
-	else
-		menuItem="$(findMenuItem "$comm")"
-	fi
+	# if input is a file, it's likely a path to a menu item. Otherwise, find menu item
+	[ -f "$comm" ] && menuItem="$comm" || menuItem="$(findMenuItem "$comm")"
+
 	if [ -n "$menuItem" ]; then
-		((verbose)) && echo -e " ├─── [$comm] ${GREEN}Found menu item:${RESET} $menuItem"
+		((verbose)) && echo -e " ├── [$comm] ${GREEN}Found menu item:${RESET} $menuItem"
+
 		# grab categories from Categories= line and add to list
 		categories=$(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")
-		if [ -z "$categories" ]; then
-			((verbose)) && echo -e " ├──── [$comm] ${RED}No categories found.${RESET}"
+		if [ -n "$categories" ]; then
+			desktopCategories+=($categories)
+			((verbose)) && echo -e " ├── [$comm] ${GREEN}Added Categories:${RESET} $categories"
+			return 0
+		else
+			((verbose)) && echo -e " ├── [$comm] ${RED}No categories found.${RESET}"
 			return 1
 		fi
-
-		desktopCategories+=($categories)
-		((verbose)) && echo -e " ├─── [$comm] ${GREEN}Added Categories:${RESET} $categories"
-		return 0
 	else
-		echo -e " ├──── [$comm] ${RED}No menu item found${RESET}"
+		((verbose)) && echo -e " ├── [$comm] ${RED}No menu item found${RESET}"
 		return 1
 	fi
 }
 
-getCategoryNode() {
+inspectNode() {
 	node="$1"
 
-	IFS=' '
+	# grab PID from window properties
+	pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
+	[ "$pid" == "found." ] && pid=""
+	((verbose)) && echo -e " ├─ ${BOLD}${BLUE}Node ID${RESET}: $node [PID: ${pid:-NONE}]"
+
+	# get WM_CLASS names and process names of this node
+	addClasses "$node"
+	[ -n "$pid" ] && addNames "$pid"
+}
+
+addClasses() {
+	node="$1"
+
+	returnValue=1
+	# FIXME: doesn't work when multiple classes exist
+	# get WM_CLASS window property
 	for class in "$(xprop -id "$node" WM_CLASS 2>/dev/null)"; do
 		[ $? -ne 0 ] && break
 		class="$(cut -d '=' -f 2 <<< "$class" | sed 's/.*"\(.*\)".*/\1/')"
-		echo -e " ---- ${ORANGE}Nothing found, trying WM_CLASS:${RESET} $class"
-		getCategoryComm "$class"
+		if [ -n "$class" ]; then
+			processList+=("$class")
+			((verbose)) && echo -e " ├── ${GREEN}Found${RESET} [$class] via WM_CLASS Property"
+			returnValue=0
+		fi
 	done
+
+	return "$returnValue"
 }
 
-getCategories() {
+addNames() {
 	local pid="$1"
+
+	# get names recursively for this pid
+	IFS=$'\n'
+	((recursive)) && for childPid in $(ps -o pid:1= --ppid "$pid" 2>/dev/null | tr -d '[:space:]'); do
+		addNames "$childPid"
+	done
 
 	# accessing process file is faster than ps
 	local comm="$({ tr '\0' '\n' < "/proc/$pid/comm"; } 2>/dev/null)"
-	[ -z "$comm" ] && return
-	((verbose)) && echo -e " ├─── Found [$comm] PID: $pid"
 
-	# get categories recursively for this pid
-	IFS=$'\n'
-	((recursive)) && for childPid in $(ps -o pid:1= --ppid "$pid" 2>/dev/null | tr -d '[:space:]'); do
-		getCategories "$childPid"
-	done
-
-	getCategoryComm "$comm" || return 1
+	if [ -n "$comm" ]; then
+		((verbose)) && echo -e " ├── ${GREEN}Found${RESET} [$comm] via PID: $pid"
+		processList+=("$comm")
+		return 0
+	else
+		return 1
+	fi
 }
 
 renameDesktops() {
@@ -89,46 +112,41 @@ renameDesktops() {
 		monitorID="$(bspc query --desktop "$desktopID" --monitors)"
 
 		if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ] || [ "${desktopBlacklist#*$monitorID}" != "$desktopBlacklist" ]; then
-			echo -e " └ Not renaming desktopID: $desktopID\n"
+			echo -e " └ Not renaming Desktop ID: $desktopID\n"
 			return 0
 		fi
-		echo " ├ Renaming desktopID: $desktopID"
+		echo -e " ├ ${BOLD}${BLUE}Renaming Desktop ID${RESET}: $desktopID"
 
 		desktopName="$(bspc query --names --desktop "$desktopID" --desktops)"
 		echo -e " ├─ Current Desktop Name: ${GREEN}$desktopName ${RESET}"
 
-		((verbose)) && echo " ├── monitorID: $monitorID"
+		((verbose)) && echo " ├─ Monitor ID: $monitorID"
 
 		desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
-		echo " ├─ desktopIndex: $desktopIndex"
+		echo " ├─ Desktop Index: $desktopIndex"
 
-		# for node in this desktop, get children processes and categories
+		# inspect each node in this desktop
 		desktopCategories=()
-		children=()
+		processList=()
 		IFS=$'\n'
 		for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
-			pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
-			[ "$pid" == "found." ] && pid=""
-			((verbose)) && echo " ├─ Node ID: $node [PID: ${pid:-NONE}]"
-
-			# try using pid to get categories, otherwise try node's WM_CLASS property
-			if [ -n "$pid" ]; then
-				getCategories "$pid" || getCategoryNode "$node"
-			else
-				getCategoryNode "$node"
-			fi
+			inspectNode "$node"
 		done
 
-		[ "${#children[@]}" -gt 0 ] && children=($(tr ' ' '\n' <<< "${children[@]}" | sort -u | tr '\n' ' '))
-		echo " ├─ Unique Processes: ${children[@]}"
+		# filter out duplicates from processList, ignoring case
+		[ "${#processList[@]}" -gt 0 ] && processList=($(tr ' ' '\n' <<< "${processList[@]}" | sort -fu | tr '\n' ' '))
+		echo " ├─ Unique Process Names: ${processList[@]}"
 
 		# check programs against custom list of categories
 		IFS=' '
-		for comm in ${children[@]}; do
-			categories="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")"
-			[ -z "$categories" ] && continue
-			desktopCategories+=($categories)
-			echo " ──── Added Custom Category: $categories"
+		for comm in ${processList[@]}; do
+			getCategory "$comm"
+
+			customCategory="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")"
+			[ -z "$customCategory" ] && continue
+
+			desktopCategories+=($customCategory)
+			echo -e " ├── [$comm] ${GREEN}Added Custom Category${RESET}: $customCategory"
 		done
 
 		desktopCategories=($(tr ' ' '\n' <<< "${desktopCategories[@]}" | sort -u | tr '\n' ' '))
@@ -149,7 +167,7 @@ renameDesktops() {
 		## fallback names
 
 		# existing programs, but none recognized
-		[ -z "$name" ] && [ "${#children[@]}" -gt 0 ] && { name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['default'][0])" <<< "$config")" || name="*"; }
+		[ -z "$name" ] && [ "${#processList[@]}" -gt 0 ] && { name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['default'][0])" <<< "$config")" || name="*"; }
 
 		# or, find custom index name
 		[ -z "$name" ] && name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['indexes']['$desktopIndex'])" <<< "$config")"
@@ -166,7 +184,7 @@ renameMonitor() {
 	monitorID="$1"
 	# ensure monitorID exists in monitorWhitelist and not in monitorBlacklist
 	if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ]; then
-		echo -e "Not renaming monitor: $monitorID\n"
+		echo -e " ├ Not renaming monitor: $monitorID\n"
 		return 0
 	fi
 	echo "Renaming monitor: $monitorID"
@@ -175,7 +193,7 @@ renameMonitor() {
 }
 
 renameAll() {
-	echo "Renaming monitors..."
+	echo " ├ Renaming All Monitors"
 	IFS=$'\n'
 	for monitorID in $(bspc query -M); do renameMonitor "$monitorID"; done
 }
@@ -183,7 +201,7 @@ renameAll() {
 monitor() {
 	bspc subscribe monitor_add monitor_remove monitor_swap desktop_add desktop_remove desktop_swap desktop_transfer node_add node_remove node_swap node_transfer | while read -r line; do	# trigger on any bspwm event
 
-		echo -e "${RED}trigger:${RESET} $line"
+		echo -e "${BOLD}${RED}trigger:${RESET} $line"
 		case "$line" in
 			monitor*) renameAll ;;
 			desktop_add*|desktop_remove*) renameAll ;;
@@ -204,7 +222,7 @@ configFile=~/.config/desknamer/desknamer.json
 verbose=0
 python=0
 
-children=()
+processList=()
 desktopCategories=()
 
 OPTS="hc:nvM:D:lLs:g:"	# colon (:) means it requires a subsequent value
@@ -283,7 +301,7 @@ case "$mode" in
 	monitor) monitor ;;
 	search) find -L /usr/share/applications /usr/local/share/applications ~/.local/share/applications -iname *"$application"*.desktop 2>/dev/null ;;
 	get)
-		getCategoryComm "$application"
+		getCategory "$application"
 		echo "${desktopCategories[@]}"
 		;;
 esac

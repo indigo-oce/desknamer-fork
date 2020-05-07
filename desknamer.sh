@@ -154,17 +154,27 @@ renameDesktops() {
 		desktopCategories=($(tr ' ' '\n' <<< "${desktopCategories[@]}" | sort -u | tr '\n' ' '))
 		echo -e " ├─ Unique Categories: ${desktopCategories[@]}"
 
-		# check config for name with lowest priority
-		name=""
-		minPriority=100
-		IFS=' '
-		for category in ${desktopCategories[@]}; do
-			priority="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][1])" <<< "$config")"
-			if [ -n "$priority" ] && [ $(echo "$priority < $minPriority" | bc -l) -eq 1 ]; then
-				minPriority="$priority"
-				name="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['categories']['$category'][0])" <<< "$config")"
-			fi
-		done
+		# using python, check config for name with lowest priority
+		# convert bash array to python array
+		pythonDesktopCategories="$(for category in "${desktopCategories[@]}"; do echo -n "\"$category\""; [ "$category" != "${desktopCategories[-1]}" ] && echo -n ", "; done)"
+		name="$(python3 -c "\
+import sys, json
+
+minPriority = 100
+name = \"\"
+
+data = json.load(open('$configFile'))
+
+for category in [$pythonDesktopCategories]:
+	try:
+		priority = data['categories'][category][1]
+	except KeyError:
+		continue
+	if priority < minPriority:
+		minPriority = priority
+		name = data['categories'][category][0]
+
+print(name)" <<< "$config")"
 
 		## fallback names
 

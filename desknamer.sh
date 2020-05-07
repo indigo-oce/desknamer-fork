@@ -52,19 +52,6 @@ getCategory() {
 	fi
 }
 
-inspectNode() {
-	node="$1"
-
-	# grab PID from window properties
-	pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
-	[ "$pid" == "found." ] && pid=""
-	((verbose)) && echo -e " ├─ ${BOLD}${BLUE}Node ID${RESET}: $node [PID: ${pid:-NONE}]"
-
-	# get WM_CLASS names and process names of this node
-	addClasses "$node"
-	[ -n "$pid" ] && addNames "$pid"
-}
-
 addClasses() {
 	local node="$1"
 
@@ -83,13 +70,13 @@ addClasses() {
 	return "$returnValue"
 }
 
-addNames() {
+addComms() {
 	local pid="$1"
 
 	# get names recursively for this pid
 	IFS=$'\n'
 	((recursive)) && for childPid in $(ps -o pid:1= --ppid "$pid" 2>/dev/null | tr -d '[:space:]'); do
-		addNames "$childPid"
+		addComms "$childPid"
 	done
 
 	# accessing process file is faster than ps
@@ -102,6 +89,19 @@ addNames() {
 	else
 		return 1
 	fi
+}
+
+inspectNode() {
+	local node="$1"
+
+	# grab PID from window properties
+	local pid=$(xprop -id "$node" _NET_WM_PID 2>/dev/null | awk '{print $3}')
+	[ "$pid" == "found." ] && pid=""
+	((verbose)) && echo -e " ├─ ${BOLD}${BLUE}Node ID${RESET}: $node [PID: ${pid:-NONE}]"
+
+	# get WM_CLASS names and process names of this node
+	addClasses "$node"
+	[ -n "$pid" ] && addComms "$pid"
 }
 
 renameDesktops() {

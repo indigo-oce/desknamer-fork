@@ -37,7 +37,7 @@ getCategory() {
 		((verbose)) && echo -e " ├── [$comm] ${GREEN}Found menu item:${RESET} $menuItem"
 
 		# grab categories from Categories= line and add to list
-		categories=$(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")
+		local categories=$(sed -n 's/;/ /g; s/^Categories=//p' "$menuItem")
 		if [ -n "$categories" ]; then
 			desktopCategories+=($categories)
 			((verbose)) && echo -e " ├── [$comm] ${GREEN}Added categories:${RESET} $categories"
@@ -66,10 +66,10 @@ inspectNode() {
 }
 
 addClasses() {
-	node="$1"
+	local node="$1"
 
 	# get WM_CLASS window property
-	returnValue=1
+	local returnValue=1
 	IFS=$'\n'
 	for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2 | sed 's/, /\n/g; s/.*"\(.*\)".*/\1/gm'); do
 		if [ -n "$class" ]; then

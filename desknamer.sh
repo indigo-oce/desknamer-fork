@@ -73,6 +73,7 @@ addClasses() {
 	IFS=$'\n'
 	for class in $(xprop -id "$node" WM_CLASS 2>/dev/null | cut -d '=' -f 2 | sed 's/, /\n/g; s/.*"\(.*\)".*/\1/gm'); do
 		if [ -n "$class" ]; then
+			[ "$class" == "WM_CLASS" ] && continue
 			processList+=("$class")
 			((verbose)) && echo -e " ├── ${GREEN}Found${RESET} [$class] via WM_CLASS property"
 			returnValue=0

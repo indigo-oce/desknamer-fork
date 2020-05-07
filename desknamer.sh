@@ -141,11 +141,14 @@ renameDesktops() {
 		for comm in ${processList[@]}; do
 			getCategory "$comm"
 
-			customCategory="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")"
-			[ -z "$customCategory" ] && continue
-
-			desktopCategories+=($customCategory)
-			echo -e " ├── [$comm] ${GREEN}Added Custom Category${RESET}: $customCategory"
+			# get custom category if present in config file
+			if grep -q "$comm" <<< "$config"; then
+				customCategory="$(2>/dev/null python3 -c "import sys, json; print(json.load(sys.stdin)['applications']['$comm'])" <<< "$config")"
+				if [ -n "$customCategory" ]; then
+					desktopCategories+=($customCategory)
+					echo -e " ├── [$comm] ${GREEN}Added custom category${RESET}: $customCategory"
+				fi
+			fi
 		done
 
 		desktopCategories=($(tr ' ' '\n' <<< "${desktopCategories[@]}" | sort -u | tr '\n' ' '))

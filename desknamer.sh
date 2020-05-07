@@ -124,11 +124,11 @@ renameDesktops() {
 		desktopIndex="$(bspc query -m "$monitorID" --desktops | grep -n "$desktopID" | cut -d ':' -f 1)"
 		echo " ├─ Desktop Index: $desktopIndex"
 
-		# inspect each node in this desktop
+		# inspect each node (containing a window) in this desktop
 		desktopCategories=()
 		processList=()
 		IFS=$'\n'
-		for node in $(bspc query -m "$monitorID" -d "$desktopID" -N); do
+		for node in $(bspc query -m "$monitorID" -d "$desktopID" -n .window -N); do
 			inspectNode "$node"
 		done
 

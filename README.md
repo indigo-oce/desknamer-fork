@@ -8,20 +8,7 @@
 
 ## Installation
 
-To clone to `~/bin/desknamer`, make executable, and add to available commands:
-
-```bash
-git clone https://gitlab.com/jallbrit/desknamer ~/bin/desknamer
-chmod +x ~/bin/desknamer/desknamer.sh
-ln -s ~/bin/desknamer/desknamer.sh ~/.local/bin/desknamer
-```
-
-To copy the sample configuration file:
-
-```bash
-mkdir -p ~/.config/desknamer
-cp ~/bin/desknamer/desknamer.json ~/.config/desknamer/desknamer.json
-```
+To install, just run `make` or `make install`.
 
 ## Usage
 

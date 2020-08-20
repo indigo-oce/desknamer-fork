@@ -1,6 +1,7 @@
 {
 	"applications": {
-		"firefox-esr": "firefox",
+		"firefox-esr": "Firefox",
+		"Firefox": "Firefox",
 		"Steam": "Steam",
 		"vlc": "vlc",
 		"weechat": "Chat",
@@ -8,7 +9,7 @@
 	},
 	"categories": {
 		"default": ["", 0],
-		"firefox": ["", 10],
+		"Firefox": ["", 10],
 		"WebBrowser": ["", 12],
 		"Email": ["", 14],
 		"Documentation": ["", 16],

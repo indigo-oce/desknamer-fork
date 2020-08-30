@@ -18,7 +18,11 @@ yay -S desknamer-git
 
 ### Manual
 
-To download and install:
+Dependency | Justification
+-----------|--------------
+`python3`  | Used to parse `json` config file
+
+Once all dependencies are met, to download and install:
 
 ```bash
 git clone https://gitlab.com/jallbrit/desknamer

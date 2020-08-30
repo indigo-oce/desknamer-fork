@@ -8,7 +8,23 @@
 
 ## Installation
 
-To install, just run `make` or `make install`.
+### Arch Linux (AUR)
+
+AUR user `loki7990` has kindly packaged `desknamer` in the AUR as [desknamer-git](https://aur.archlinux.org/packages/desknamer-git/). It can be installed via an AUR helper, e.g. `yay`:
+
+```bash
+yay -S desknamer-git
+```
+
+### Manual
+
+To download and install:
+
+```bash
+git clone https://gitlab.com/jallbrit/desknamer
+cd desknamer
+make install
+```
 
 ## Usage
 

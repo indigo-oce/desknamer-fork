@@ -188,7 +188,10 @@ print(name)" <<< "$config")"
 		[ -z "$name" ] && name="$desktopIndex"	# no applications
 
 		echo -e " └─ New Name: ${BLUE}$name ${RESET}\n"
-		bspc desktop "$desktopID" --rename "$name"
+
+		# only rename desktop if new name is different
+		[ "$(bspc query -d "$desktopID" --names -D)" != "$name" ] &&
+			bspc desktop "$desktopID" --rename "$name"
 	done
 }
 

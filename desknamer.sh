@@ -111,7 +111,6 @@ renameDesktops() {
 		monitorID="$(bspc query --desktop "$desktopID" --monitors)"
 
 		# ensure monitor or desktop is not in blacklist
-		echo "test"
 		if grep -s "$monitorID" "$configHome/monitor.blacklist" || grep -s "$desktopID" "$configHome/desktop.blacklist"; then
 			echo -e " └ Not renaming Desktop ID (blacklist): $desktopID\n"
 			return 0
@@ -241,8 +240,8 @@ python=0
 processList=()
 desktopCategories=()
 
-OPTS="hc:nvm:d:M:D:lLs:g:"	# colon (:) means it requires a subsequent value
-LONGOPTS="help,config:,norecursive,verbose,list-applications,list-categories,search:,get:"
+OPTS="hc:nvm:d:M:D:lLs:g:r:"	# colon (:) means it requires a subsequent value
+LONGOPTS="help,config:,norecursive,verbose,list-applications,list-categories,search:,get:,rename:"
 
 parsed=$(getopt --options=$OPTS --longoptions=$LONGOPTS -- "$@")
 eval set -- "${parsed[@]}"
@@ -275,6 +274,7 @@ while true; do
 		-L|--list-categories) mode="list-categories"; shift ;;
 		-s|--search) mode="search"; application="$2"; shift 2 ;;
 		-g|--get) mode="get"; application="$2"; shift 2 ;;
+		-r|--rename) mode="none"; renameDesktops "$2"; shift 2 ;;
 
 		--) shift; break ;;
 		*)

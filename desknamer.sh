@@ -110,8 +110,10 @@ renameDesktops() {
 	for desktopID in $desktopIDs; do
 		monitorID="$(bspc query --desktop "$desktopID" --monitors)"
 
-		if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ] || [ "${desktopBlacklist#*$monitorID}" != "$desktopBlacklist" ]; then
-			echo -e " └ Not renaming Desktop ID: $desktopID\n"
+		# ensure monitor or desktop is not in blacklist
+		echo "test"
+		if grep -s "$monitorID" "$configHome/monitor.blacklist" || grep -s "$desktopID" "$configHome/desktop.blacklist"; then
+			echo -e " └ Not renaming Desktop ID (blacklist): $desktopID\n"
 			return 0
 		fi
 		echo -e " ├ ${BOLD}${BLUE}Renaming Desktop ID${RESET}: $desktopID"
@@ -197,11 +199,6 @@ print(name)" <<< "$config")"
 
 renameMonitor() {
 	monitorID="$1"
-	# ensure monitorID exists in monitorWhitelist and not in monitorBlacklist
-	if [ "${monitorBlacklist#*$monitorID}" != "$monitorBlacklist" ]; then
-		echo -e " ├ Not renaming monitor: $monitorID\n"
-		return 0
-	fi
 	echo "Renaming monitor: $monitorID"
 	IFS=$'\n'
 	for desktop in $(bspc query -m "$monitorID" -D); do renameDesktops "$desktop"; done
@@ -228,11 +225,15 @@ monitor() {
 	done
 }
 
+configHome=~/.config/desknamer
+configFile="$configHome"/desknamer.json
+
+mkdir -p "$configHome"	# ensure configuration dir exists
+
+
 flag_h=0
 recursive=1
 mode="monitor"
-
-configFile=~/.config/desknamer/desknamer.json
 
 verbose=0
 python=0
@@ -240,8 +241,8 @@ python=0
 processList=()
 desktopCategories=()
 
-OPTS="hc:nvM:D:lLs:g:"	# colon (:) means it requires a subsequent value
-LONGOPTS="help,config:,norecursive,verbose,monitor-blacklist:,desktop-blacklist:,list-applications,list-categories,search:,get:"
+OPTS="hc:nvm:d:M:D:lLs:g:"	# colon (:) means it requires a subsequent value
+LONGOPTS="help,config:,norecursive,verbose,list-applications,list-categories,search:,get:"
 
 parsed=$(getopt --options=$OPTS --longoptions=$LONGOPTS -- "$@")
 eval set -- "${parsed[@]}"
@@ -253,8 +254,22 @@ while true; do
 		-n|--norecursive) recursive=0; shift ;;
 		-v|--verbose) verbose=1; shift ;;
 
-		-M|--monitor-blacklist) monitorBlacklistIn="$2"; shift 2 ;;
-		-D|--desktop-blacklist) desktopBlacklistIn="$2"; shift 2 ;;
+		-m|--monitor-blacklist-add)
+			mode="none"
+			echo "$2" >> $configHome/monitor.blacklist
+			shift 2;;
+		-M|--monitor-blacklist-remove)
+			mode="none"
+			sed -i "/^$2$/d" $configHome/monitor.blacklist
+			shift 2;;
+		-d|--desktop-blacklist-add)
+			mode="none"
+			echo "$2" >> $configHome/desktop.blacklist
+			shift 2;;
+		-D|--desktop-blacklist-remove)
+			mode="none"
+			sed -i "/^$2$/d" $configHome/desktop.blacklist
+			shift 2;;
 
 		-l|--list-applications) mode="list-applications"; shift ;;
 		-L|--list-categories) mode="list-categories"; shift ;;
@@ -277,27 +292,16 @@ desknamer.sh monitors your open desktops and renames them according to what's in
 optional args:
   -c, --config FILE       path to alternate configuration file
   -n, --norecursive       don't inspect windows recursively
-  -M \"MONITOR [MONITOR2]...\"
-                          specify monitor names or IDs to ignore
-  -D \"DESKTOP [DESKTOP2]...\"
-                          specify desktop names or IDs to ignore
+  -m <monitor_id>         add <monitor_id> to monitor blacklist
+  -d <desktop_id>         add <desktop_id> to desktop blacklist
+  -M <monitor_id>         remove <monitor_id> from monitor blacklist
+  -D <desktop_id>         remove <desktop_id> from desktop blacklist
   -l, --list-applications  print all applications found on your machine
   -L, --list-categories   print all categories found on your machine
   -s, --search PROGRAM    find .desktop files matching *program*.desktop
   -g, --get PROGRAM       get categories for given program
   -v, --verbose           make output more verbose
   -h, --help              show help"
-
-# convert {monitor,desktop} names to ids
-IFS=' '
-for monitor in $monitorBlacklistIn; do
-	found="$(bspc query -m "$monitor" -M) "
-	[ $? -eq 0 ] && monitorBlacklist+="$found"
-done
-for desktop in $desktopBlacklistIn; do
-	found="$(bspc query -d "$desktop" -D) "
-	[ $? -eq 0 ] && desktopBlacklist+="$found"
-done
 
 if ((flag_h)); then
 	printf '%s\n' "$HELP"
@@ -311,6 +315,7 @@ fi
 config="$(cat "$configFile")"
 
 case "$mode" in
+	none) ;;
 	list-applications) getAllApplications ;;
 	list-categories) getAllCategories ;;
 	monitor) monitor ;;

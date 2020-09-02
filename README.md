@@ -120,6 +120,32 @@ A good use of this key is when you want regular numbers to be replaced with a se
 }
 ```
 
+## Blacklists
+
+There are times when you want certain monitors or desktops to be ignored by desknamer, e.g.:
+
+* Virtual monitors
+* You want to give a desktop a custom name and have it not overwritten by desknamer
+
+In the configuration folder (`~/.config/desknamer/`), there are 2 files:
+
+* `monitor.blacklist`: contains monitor IDs to be ignored
+* `desktop.blacklist`: contains desktop IDs to be ignored
+
+To find a monitor or desktop ID, you can use `bspc query` (documented in `man bspc`). For example, to add the currently focused monitor's ID to the blacklist:
+
+```bash
+desknamer -m "$(bspc query -m -M)"
+```
+
+As an alternative, you can just edit the configuration file directly, which has the same effect:
+
+```bash
+bspc query -m -M >> ~/.config/desknamer/monitor.blacklist
+```
+
+Removing monitor or desktop IDs from the blacklist is a bit easier using `desknamer -M/-D`, because otherwise you have to go into the blacklist and find the line you want to remove.
+
 ## How Categories are Found
 
 Fortunately for us, most applications installed on your system have a `.desktop` file (likely located in `/usr/share/applications/`) that contains things like:

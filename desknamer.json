@@ -1,14 +1,21 @@
 {
 	"applications": {
+		"firefox": "Firefox",
 		"firefox-esr": "Firefox",
 		"Firefox": "Firefox",
+		"IceCat": "Firefox",
 		"Steam": "Steam",
 		"vlc": "vlc",
-		"weechat": "Chat",
-		"urxvt": "TerminalEmulator"
+		"Discord": "Discord",
+		"qutebrowser": "WebBrowser",
+		"alacritty": "TerminalEmulator",
+		"st": "TerminalEmulator",
+		"emacs": "Emacs"
 	},
 	"categories": {
 		"default": ["", 0],
+		"Discord": ["ﭮ", 1],
+		"Emacs": ["謁", 2],
 		"Firefox": ["", 10],
 		"WebBrowser": ["", 12],
 		"Email": ["", 14],

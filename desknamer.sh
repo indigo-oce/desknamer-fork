@@ -211,7 +211,7 @@ renameAll() {
 }
 
 monitor() {
-	bspc subscribe monitor_add monitor_remove monitor_swap desktop_add desktop_remove desktop_swap desktop_transfer node_add node_remove node_swap node_transfer | while read -r line; do	# trigger on any bspwm event
+	bspc subscribe monitor_add monitor_remove monitor_swap desktop_add desktop_remove desktop_swap desktop_transfer node_focus node_add node_remove node_swap node_transfer | while read -r line; do	# trigger on any bspwm event
 
 		echo -e "${BOLD}${RED}trigger:${RESET} $line"
 		case "$line" in

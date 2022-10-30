@@ -10,7 +10,8 @@
 		"qutebrowser": "WebBrowser",
 		"alacritty": "TerminalEmulator",
 		"st": "TerminalEmulator",
-		"emacs": "Emacs"
+		"emacs": "Emacs",
+		"kdeconnect-app": "Settings"
 	},
 	"categories": {
 		"default": ["", 0],
